@@ -7,6 +7,8 @@
 #include "romfs.h"
 #include "osdebug.h"
 #include "hash-djb2.h"
+#include "clib.h"
+
 
 struct romfs_fds_t {
     const uint8_t * file;
@@ -66,18 +68,28 @@ static off_t romfs_seek(void * opaque, off_t offset, int whence) {
 }
 
 const uint8_t * romfs_get_file_by_hash(const uint8_t * romfs, uint32_t h, uint32_t * len) {
-    const uint8_t * meta;
+    const uint8_t * meta = romfs;
+    uint32_t hash, offset = 0;
 
-    for (meta = romfs; get_unaligned(meta) && get_unaligned(meta + 4); meta += get_unaligned(meta + 4) + 8) {
-        if (get_unaligned(meta) == h) {
-            if (len) {
-                *len = get_unaligned(meta + 4);
-            }
-            return meta + 8;
-        }
+    while((hash = get_unaligned(meta + offset))){
+      offset += 4;
+
+      offset += (1 + meta[offset]);
+      
+      // length of a file
+      if(hash != h){
+      	offset += get_unaligned(meta + offset) + 4;
+	continue;
+      }
+      if(len)
+        *len = get_unaligned(meta + offset);
+
+     return meta + offset + 4;
+    
     }
-
-    return NULL;
+       
+   return NULL;
+  
 }
 
 static int romfs_open(void * opaque, const char * path, int flags, int mode) {
@@ -85,7 +97,7 @@ static int romfs_open(void * opaque, const char * path, int flags, int mode) {
     const uint8_t * romfs = (const uint8_t *) opaque;
     const uint8_t * file;
     int r = -1;
-
+   
     file = romfs_get_file_by_hash(romfs, h, NULL);
 
     if (file) {
@@ -99,7 +111,44 @@ static int romfs_open(void * opaque, const char * path, int flags, int mode) {
     return r;
 }
 
+static int romfs_show_files(void *opaque){
+	
+	int len;
+	uint8_t *meta=(uint8_t)*opaque;
+	int buf[255];
+
+	if(!meta) return -1;
+
+	while(get_unaligned(meta)){
+	
+	meta+=4;
+
+	len = meta[0];//length of file name
+
+	meta++;
+
+	memcpy(buf,meta,len);
+	buf[len]='\0';
+
+	fio_printf(1,"%s ", buf);
+
+	meta += len;
+	meta += get_unaligned(meta) + 4;
+
+	}
+	
+	fio_printf(1,"\r\n");
+	return 0;
+}
+
+
+static int file_operation romfs_open_and_show = {
+	.open = romfs_open,
+	.show_file = romfs_show_files	
+}
+
+
 void register_romfs(const char * mountpoint, const uint8_t * romfs) {
 //    DBGOUT("Registering romfs `%s' @ %p\r\n", mountpoint, romfs);
-    register_fs(mountpoint, romfs_open, (void *) romfs);
+    register_fs(mountpoint, &romfs_open_and_show, (void *) romfs);
 }
