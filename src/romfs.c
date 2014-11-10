@@ -72,15 +72,19 @@ const uint8_t * romfs_get_file_by_hash(const uint8_t * romfs, uint32_t h, uint32
     uint32_t hash, offset = 0;
 
     while((hash = get_unaligned(meta + offset))){
+      //move to length of file name.
       offset += 4;
-
+      
+      //move to length of a file.
       offset += (1 + meta[offset]);
       
-      // length of a file
+      //If input file differ from system file, move point to next file block.
       if(hash != h){
       	offset += get_unaligned(meta + offset) + 4;
 	continue;
       }
+
+      //Get file length.
       if(len)
         *len = get_unaligned(meta + offset);
 
@@ -121,17 +125,21 @@ static int romfs_show_files(void *opaque){
 
 	while(get_unaligned(meta)){
 	
+	//Move to length of file name.
 	meta+=4;
-
-	len = meta[0];//length of file name
+	
+	//Get length of file name.
+	len = meta[0];
 
 	meta++;
-
+	
+	//Store file name to buf.
 	memcpy(buf,meta,len);
 	buf[len]='\0';
 
 	fio_printf(1,"%s ", buf);
-
+	
+	//Move to next block.
 	meta += len;
 	meta += get_unaligned(meta) + 4;
 
