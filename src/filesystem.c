@@ -10,7 +10,7 @@
 
 struct fs_t {
     uint32_t hash;
-    fs_open_t cb;
+    static file_operarion *fops;
     void * opaque;
 };
 
@@ -20,14 +20,44 @@ __attribute__((constructor)) void fs_init() {
     memset(fss, 0, sizeof(fss));
 }
 
-int register_fs(const char * mountpoint, fs_open_t callback, void * opaque) {
+
+static int fs_get_fss(const char *str){
+	int i;
+	uint32_t hash = hash_djb2( (const uin8_t *) str , -1 );
+	
+	//To detect where is the address of starting files.
+	for(i = 0; i < MAX_FS && fss[i].fops ; i++ ){
+	  if(fss[i].hash == hash)
+	    return &fss[i];	    
+	}
+  return 0;
+}
+
+int fs_show_file(){
+	
+	//*fs_ptr is address of starting file.
+	struct fs_t *fs_ptr = fs_get_fss("romfs");
+	
+	if(!fs_ptr || !fs_ptr->fops || !fs_ptr->fops->show_file  )
+	return 1;
+	
+	//Input correcting address to show file name. 
+	fs_ptr->fops->show_file(fs_ptr->opaque);
+
+	return 0;
+
+}
+
+int register_fs(const char * mountpoint, static file_operation *fops, void * opaque) {
     int i;
-    DBGOUT("register_fs(\"%s\", %p, %p)\r\n", mountpoint, callback, opaque);
+    //DBGOUT("register_fs(\"%s\", %p, %p)\r\n", mountpoint, callback, opaque);
     
     for (i = 0; i < MAX_FS; i++) {
-        if (!fss[i].cb) {
+        if (!fss[i].fops) 
+		continue;
+
             fss[i].hash = hash_djb2((const uint8_t *) mountpoint, -1);
-            fss[i].cb = callback;
+            fss[i].fops= fops	;
             fss[i].opaque = opaque;
             return 0;
         }
