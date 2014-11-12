@@ -149,7 +149,7 @@ ssize_t fio_read(int fd, void * buf, size_t count) {
 
 ssize_t fio_write(int fd, const void * buf, size_t count) {
     ssize_t r = 0;
-//    DBGOUT("fio_write(%i, %p, %i)\r\n", fd, buf, count);
+    //	DBGOUT("fio_write(%i, %p, %i)\r\n", fd, buf, count);
     if (fio_is_open_int(fd)) {
         if (fio_fds[fd].fdwrite) {
             r = fio_fds[fd].fdwrite(fio_fds[fd].opaque, buf, count);
@@ -224,7 +224,11 @@ static int devfs_open(void * opaque, const char * path, int flags, int mode) {
     return -1;
 }
 
+int static file_operation devfs_fop ={
+	.open = devfs_open
+};
+
 void register_devfs() {
     DBGOUT("Registering devfs.\r\n");
-    register_fs("dev", devfs_open, NULL);
+    register_fs("dev", &devfs_fop, NULL);
 }
